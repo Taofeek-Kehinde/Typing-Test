@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Clock, Keyboard, Trophy, RefreshCw, Sparkles, ChevronRight } from 'lucide-react';
+import { Clock, Trophy, RefreshCw, Sparkles, ChevronRight } from 'lucide-react';
 import './App.css';
 
 type AccuracyColor = '#10b981' | '#f59e0b' | '#ef4444';
@@ -19,11 +19,10 @@ function App() {
   const [errors, setErrors] = useState<number>(0);
   const [totalCharsTyped, setTotalCharsTyped] = useState<number>(0);
   const inputRef = useRef<HTMLInputElement>(null);
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Sample word list for typing test
-  const wordList = [
+  const wordList = useMemo(() => [
     "the", "quick", "brown", "fox", "jumps", "over", "lazy", "dog",
     "programming", "computers", "experience", "success", "failure",
     "courage", "counts", "technology", "future", "dreams", "coding",
@@ -33,14 +32,19 @@ function App() {
     "desktop", "server", "database", "network", "security",
     "algorithm", "function", "variable", "constant", "interface",
     "component", "module", "system", "process", "framework"
-  ];
+  ], []);
 
-  // Initialize words
-  useEffect(() => {
-    generateNewWords();
-  }, []);
+  const calculateResults = useCallback(() => {
+    const minutes = (60 - time) / 60;
+    const calculatedWpm = minutes > 0 ? Math.round(typedWords / minutes) : 0;
+    setWpm(calculatedWpm);
 
-  const generateNewWords = () => {
+    const correctChars = totalCharsTyped - errors;
+    const calculatedAccuracy = totalCharsTyped > 0 ? Math.round((correctChars / totalCharsTyped) * 100) : 100;
+    setAccuracy(calculatedAccuracy);
+  }, [time, typedWords, totalCharsTyped, errors]);
+
+  const generateNewWords = useCallback(() => {
     const newWords: string[] = [];
     for (let i = 0; i < 50; i++) {
       const randomWord = wordList[Math.floor(Math.random() * wordList.length)];
@@ -49,13 +53,18 @@ function App() {
     setWords(newWords);
     setCurrentWordIndex(0);
     setInput('');
-  };
+  }, [wordList]);
+
+  // Initialize words
+  useEffect(() => {
+    generateNewWords();
+  }, [generateNewWords]);
 
   const startTest = useCallback(() => {
     if (!isRunning && !isFinished) {
       setIsRunning(true);
       inputRef.current?.focus();
-      
+
       timerRef.current = setInterval(() => {
         setTime(prev => {
           if (prev <= 1) {
@@ -71,7 +80,7 @@ function App() {
         });
       }, 1000);
     }
-  }, [isRunning, isFinished]);
+  }, [isRunning, isFinished, calculateResults]);
 
   const resetTest = () => {
     if (timerRef.current) {
@@ -89,17 +98,6 @@ function App() {
     setErrors(0);
     setTotalCharsTyped(0);
     inputRef.current?.focus();
-  };
-
-  const calculateResults = () => {
-    const minutes = (60 - time) / 60;
-    const calculatedWpm = minutes > 0 ? Math.round(typedWords / minutes) : 0;
-    setWpm(calculatedWpm);
-    
-    const totalChars = words.slice(0, currentWordIndex).join('').length;
-    const correctChars = totalChars - errors;
-    const calculatedAccuracy = totalChars > 0 ? Math.round((correctChars / totalChars) * 100) : 100;
-    setAccuracy(calculatedAccuracy);
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
